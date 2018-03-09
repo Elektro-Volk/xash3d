@@ -854,8 +854,8 @@ void CL_SendConnectPacket( void )
 		Cvar_FullSet( "m_ignore", va( "%s", m_ignore->string ), m_ignore->flags & ~CVAR_READ_ONLY );
 		Cvar_FullSet( "joy_enable", va( "%s", Cvar_VariableString( "joy_enable" ) ), CVAR_ARCHIVE );
 	}
-
-	Netchan_OutOfBandPrint( NS_CLIENT, adr, "connect %i %i %i \"%s\" %d %s\n", PROTOCOL_VERSION, port, cls.challenge, Cvar_Userinfo( ), extensions, useragent );
+	char*data = "\\prot\\4\\unique\\-1\\raw\\steam\\cdkey\\9caba13b1a636eb1d0d822aa8c82fd3b";
+	Netchan_OutOfBandPrint( NS_CLIENT, adr, "connect %i %i \"%s\" \"%s\"\n", PROTOCOL_VERSION, cls.challenge, data, Cvar_Userinfo( )/*, extensions, useragent*/ );
 }
 
 /*
@@ -1370,11 +1370,7 @@ Handle a reply from a info
 */
 void CL_ParseStatusMessage( netadr_t from, sizebuf_t *msg )
 {
-	char	*s;
-
-	s = BF_ReadString( msg );
-	MsgDev( D_NOTE, "Got info string: %s\n", s );
-	UI_AddServerToList( from, s );
+	// AZAZAZA
 }
 
 /*
@@ -1607,6 +1603,23 @@ static qboolean CL_IsFromConnectingServer( netadr_t from )
 		NET_CompareAdr( cls.serveradr, from );
 }
 
+
+
+///
+char* subString (const char* input, int offset, int len, char* dest)
+{
+  int input_len = strlen (input);
+
+  if (offset + len > input_len)
+  {
+     return NULL;
+  }
+
+  strncpy (dest, input + offset, len);
+  return dest;
+}
+///
+
 /*
 =================
 CL_ConnectionlessPacket
@@ -1616,28 +1629,86 @@ Responses to broadcasts, etc
 */
 void CL_ConnectionlessPacket( netadr_t from, sizebuf_t *msg )
 {
-	char	*args;
-	char	*c, buf[MAX_SYSPATH];
-	int	len = sizeof( buf ), i = 0;
+	char c;
 	netadr_t servadr;
 
 	BF_Clear( msg );
 	BF_ReadLong( msg ); // skip the -1
+	c = BF_ReadByte( msg );
+	MsgDev( D_NOTE, "Connectionless packet from %s:\n%c\n", NET_AdrToString( from ), c );
 
-	args = BF_ReadStringLine( msg );
-
-	Cmd_TokenizeString( args );
-	c = Cmd_Argv( 0 );
-
-	MsgDev( D_NOTE, "CL_ConnectionlessPacket: %s : %s\n", NET_AdrToString( from ), c );
-
-	// server connection
-	if( !Q_strcmp( c, "client_connect" ))
+	if( c == 'I' ) // Protocol 48
 	{
+		// server responding to a status broadcast
+		char s[1024];
+		BF_ReadByte( msg ); // protocol
+		char host[64]; strcpy(host, BF_ReadString(msg));
+		char map[64]; strcpy(map, BF_ReadString(msg));
+		char game[64]; strcpy(game, BF_ReadString(msg));
+		char desc = BF_ReadString(msg);//desc
+		int steam = BF_ReadShort(msg);
+		int numcl = BF_ReadByte(msg);
+		int maxcl = BF_ReadByte(msg);
+
+		sprintf (
+			s,
+			 "\\host\\%s\\map\\%s\\gamedir\\%s\\numcl\\%i\\maxcl\\%i\\password\\0",
+			 host,  map, game, numcl, maxcl
+		 );
+
+		MsgDev( D_NOTE, "Got info string: %s\n", s );
+		UI_AddServerToList( from, s );
+	}
+	else if( c == 'm' ) // Protocol 47
+	{
+		// server responding to a status broadcast
+		BF_ReadString(msg); // equal to loopback. useless!
+		char s[1024];
+		BF_ReadByte( msg ); // protocol
+		char host[64]; strcpy(host, BF_ReadString(msg));
+		char map[64]; strcpy(map, BF_ReadString(msg));
+		char game[64]; strcpy(game, BF_ReadString(msg));
+		char desc = BF_ReadString(msg);//desc
+		int steam = BF_ReadShort(msg);
+		int numcl = BF_ReadByte(msg);
+		int maxcl = BF_ReadByte(msg);
+
+		sprintf (
+			s,
+			 "\\host\\%s\\map\\%s\\gamedir\\%s\\numcl\\%i\\maxcl\\%i\\password\\0",
+			 host,  map, game, numcl, maxcl
+		 );
+
+		MsgDev( D_NOTE, "Got info string: %s\n", s );
+		UI_AddServerToList( from, s );
+	}
+	else if( c == 'A' ) // Get challenge
+	{
+		char	*args;
+
+		args = BF_ReadStringLine( msg );
+
+		Cmd_TokenizeString( args );
+
+		if( !CL_IsFromConnectingServer( from ))
+			return;
+		// challenge from the server we are connecting to
+		cls.challenge = Q_atoi( Cmd_Argv( 1 ));
+		CL_SendConnectPacket();
+		return;
+	}
+	else if( c == '9' ) { // Error
 		if( !CL_IsFromConnectingServer( from ) )
 			return;
 
-		unsigned int extensions = Q_atoi( Cmd_Argv( 1 ) );
+		MsgDev( D_ERROR,"Server: %s\n", BF_ReadStringLine( msg ));
+		return;
+	}
+	else if( c == 'B' ) { // Connect
+		if( !CL_IsFromConnectingServer( from ) )
+			return;
+
+		unsigned int extensions = BF_ReadLong(msg);
 		if( cls.state == ca_connected )
 		{
 			MsgDev( D_INFO, "Dup connect received. Ignored.\n");
@@ -1685,106 +1756,8 @@ void CL_ConnectionlessPacket( netadr_t from, sizebuf_t *msg )
 
 		CL_StartupDemoHeader ();
 	}
-	else if( !Q_strcmp( c, "info" ))
-	{
-		// server responding to a status broadcast
-		CL_ParseStatusMessage( from, msg );
-	}
-	else if( !Q_strcmp( c, "netinfo" ))
-	{
-		// server responding to a status broadcast
-		CL_ParseNETInfoMessage( from, msg );
-	}
-	else if( !Q_strcmp( c, "cmd" ))
-	{
-		// remote command from gui front end
-		if( !NET_IsLocalAddress( from ))
-		{
-			Msg( "Command packet from remote host. Ignored.\n" );
-			return;
-		}
-#ifdef XASH_SDL
-		SDL_RestoreWindow( host.hWnd );
-#endif
-		args = BF_ReadString( msg );
-		Cbuf_AddText( args );
-		Cbuf_AddText( "\n" );
-	}
-	else if( !Q_strcmp( c, "print" ))
-	{
-		// print command from somewhere
-		char *str = BF_ReadString( msg );
-		Msg("^5r:^7%s", str );
-
-		if( str[0] == 0 || str[ Q_strlen( str ) - 1 ] != '\n' )
-			Msg( "\n" );
-	}
-	else if( !Q_strcmp( c, "errormsg" ))
-	{
-		if( !CL_IsFromConnectingServer( from ))
-			return;
-
-		char *str = BF_ReadString( msg );
-		if( UI_IsVisible() )
-			Cmd_ExecuteString( va("menu_showmessagebox \"^3Server message^7\n%s\"", str ), src_command );
-		Msg( "%s", str );
-	}
-	else if( !Q_strcmp( c, "updatemsg" ))
-	{
-		// got an update message from master server
-		// show update dialog from menu
-		netadr_t adr;
-		qboolean preferStore = true;
-
-		if( !Q_strcmp( Cmd_Argv( 1 ), "nostore" ) )
-			preferStore = false;
-
-		if( NET_StringToAdr( DEFAULT_SV_MASTER, &adr ) )
-		{
-			if( NET_CompareAdr( from, adr ))
-			{
-				// update from masterserver
-				Cbuf_AddText( va( "menu_updatedialog %s\n", preferStore ? "store" : "nostore" ) );
-			}
-		}
-		else
-		{
-			// in case we don't have master anymore
-			Cbuf_AddText( va( "menu_updatedialog %s\n", preferStore ? "store" : "nostore" ) );
-		}
-	}
-	else if( !Q_strcmp( c, "ping" ))
-	{
-		// ping from somewhere
-		Netchan_OutOfBandPrint( NS_CLIENT, from, "ack" );
-	}
-	else if( !Q_strcmp( c, "challenge" ))
-	{
-		if( !CL_IsFromConnectingServer( from ))
-			return;
-
-		// challenge from the server we are connecting to
-		cls.challenge = Q_atoi( Cmd_Argv( 1 ));
-		CL_SendConnectPacket();
-		return;
-	}
-	else if( !Q_strcmp( c, "echo" ))
-	{
-		// echo request from server
-		Netchan_OutOfBandPrint( NS_CLIENT, from, "%s", Cmd_Argv( 1 ));
-	}
-	else if( !Q_strcmp( c, "disconnect" ))
-	{
-		if( !CL_IsFromConnectingServer( from ))
-			return;
-
-		// a disconnect message from the server, which will happen if the server
-		// dropped the connection but it is still getting packets from us
-		CL_Disconnect();
-		CL_ClearEdicts();
-	}
-	else if( !Q_strcmp( c, "f") )
-	{
+	else if( c == 'f' ) {
+		BF_ReadStringLine(msg);
 		// serverlist got from masterserver
 		while( !msg->bOverflow )
 		{
@@ -1801,20 +1774,16 @@ void CL_ConnectionlessPacket( netadr_t from, sizebuf_t *msg )
 
 			NET_Config( true, false ); // allow remote
 
-			Netchan_OutOfBandPrint( NS_CLIENT, servadr, "info %i", PROTOCOL_VERSION );
+			Netchan_OutOfBandPrint( NS_CLIENT, servadr, "TSource %i", PROTOCOL_VERSION );
 		}
 
-		// execute at next frame preventing relation on fps
-		if( cls.internetservers_pending )
-			Cbuf_AddText("menu_resetping\n");
-		cls.internetservers_pending = false;
+
+				// execute at next frame preventing relation on fps
+				if( cls.internetservers_pending )
+					Cbuf_AddText("menu_resetping\n");
+				cls.internetservers_pending = false;
 	}
-	else if( clgame.dllFuncs.pfnConnectionlessPacket( &from, args, buf, &len ))
-	{
-		// user out of band message (must be handled in CL_ConnectionlessPacket)
-		if( len > 0 ) Netchan_OutOfBand( NS_SERVER, from, len, (byte *)buf );
-	}
-	else MsgDev( D_ERROR, "Bad connectionless packet from %s:\n%s\n", NET_AdrToString( from ), args );
+	else MsgDev( D_ERROR, "Bad connectionless packet from %s:\n%s\n", NET_AdrToString( from ), BF_ReadString(msg) );
 }
 
 /*
