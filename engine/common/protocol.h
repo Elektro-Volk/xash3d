@@ -60,7 +60,7 @@ GNU General Public License for more details.
 #define svc_addangle		38	// [angle] add angles when client turn on mover
 #define svc_usermessage		39	// [byte][byte][string] REG_USER_MSG stuff
 #define svc_packetentities		40	// [short][...]
-#define svc_deltapacketentities	41	// [short][byte][...] 
+#define svc_deltapacketentities	41	// [short][byte][...]
 #define svc_chokecount		42	// [byte]
 #define svc_resourcelist		43	// [short][...]
 #define svc_deltamovevars		44	// [movevars_t]
@@ -77,7 +77,7 @@ GNU General Public License for more details.
 
 // client to server
 #define clc_bad			0	// immediately drop client when received
-#define clc_nop			1 		
+#define clc_nop			1
 #define clc_move			2	// [[usercmd_t]
 #define clc_stringcmd		3	// [string] message
 #define clc_delta			4	// [byte] sequence number, requests delta compression of message
@@ -85,8 +85,10 @@ GNU General Public License for more details.
 #define clc_userinfo		6	// [[userinfo string]
 #define clc_fileconsistency		7
 #define clc_voicedata		8
-#define clc_requestcvarvalue		9
-#define clc_requestcvarvalue2		10
+#define clc_hltv		9
+#define clc_requestcvarvalue		10
+#define clc_requestcvarvalue2		11
+
 
 #define MAX_VISIBLE_PACKET		512	// 512 visible entities per frame (hl1 has 256)
 

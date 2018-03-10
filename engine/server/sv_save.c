@@ -158,7 +158,7 @@ static TYPEDESCRIPTION gEntityTable[] =
 	DEFINE_FIELD( ENTITYTABLE, classname, FIELD_STRING ),
 };
 
-TYPEDESCRIPTION gEntvarsDescription[] = 
+TYPEDESCRIPTION gEntvarsDescription[] =
 {
 	DEFINE_ENTITY_FIELD( classname, FIELD_STRING ),
 	DEFINE_ENTITY_GLOBAL_FIELD( globalname, FIELD_STRING ),
@@ -269,7 +269,7 @@ qboolean SaveRestore_Seek( SAVERESTOREDATA *pSaveData, int absPosition )
 {
 	if( absPosition < 0 || absPosition >= pSaveData->bufferSize )
 		return false;
-	
+
 	pSaveData->size = absPosition;
 	pSaveData->pCurrentData = pSaveData->pBaseData + pSaveData->size;
 
@@ -289,7 +289,7 @@ void SaveRestore_InitEntityTable( SAVERESTOREDATA *pSaveData, ENTITYTABLE *pNewT
 	// setup entitytable
 	for( i = 0; i < entityCount; i++ )
 	{
-		pTable = &pSaveData->pTable[i];		
+		pTable = &pSaveData->pTable[i];
 		pTable->pent = EDICT_NUM( i );
 	}
 }
@@ -303,7 +303,7 @@ ENTITYTABLE *SaveRestore_DetachEntityTable( SAVERESTOREDATA *pSaveData )
 
 	return pReturn;
 }
-	
+
 void SaveRestore_InitSymbolTable( SAVERESTOREDATA *pSaveData, char **pNewTokens, int sizeTable )
 {
 	ASSERT( pSaveData->pTokens == NULL );
@@ -373,7 +373,7 @@ int SV_MapCount( const char *pPath )
 {
 	search_t	*t;
 	int	count = 0;
-	
+
 	t = FS_Search( pPath, true, true );	// lookup only in gamedir
 	if( !t ) return count; // empty
 
@@ -644,13 +644,13 @@ int SV_IsValidSave( void )
 	if( svs.clients && svs.clients[0].state == cs_spawned )
 	{
 		edict_t	*pl = svs.clients[0].edict;
-		
+
 		if( !pl )
 		{
 			Msg( "Can't savegame without a player!\n" );
 			return 0;
 		}
-			
+
 		if( pl->v.deadflag != false || pl->v.health <= 0.0f )
 		{
 			Msg( "Can't savegame with a dead player.\n" );
@@ -683,13 +683,13 @@ void SV_AgeSaveList( const char *pName, int count )
 	while( count > 0 )
 	{
 		if( count == 1 )
-		{	
+		{
 			// quick.sav
 			Q_snprintf( oldName, sizeof( oldName ), "save/%s.sav", pName );
 			Q_snprintf( oldImage, sizeof( oldImage ), "save/%s.bmp", pName );
 		}
 		else
-		{	
+		{
 			// quick04.sav, etc.
 			Q_snprintf( oldName, sizeof( oldName ), "save/%s%02d.sav", pName, count - 1 );
 			Q_snprintf( oldImage, sizeof( oldImage ), "save/%s%02d.bmp", pName, count - 1 );
@@ -724,7 +724,7 @@ void SV_DirectoryCopy( const char *pPath, file_t *pFile )
 		pCopy = FS_Open( t->filenames[i], "rb", true );
 
 		// filename can only be as long as a map name + extension
-		Q_strncpy( szName, FS_FileWithoutPath( t->filenames[i] ), SAVENAME_LENGTH );		
+		Q_strncpy( szName, FS_FileWithoutPath( t->filenames[i] ), SAVENAME_LENGTH );
 		FS_Write( pFile, szName, SAVENAME_LENGTH );
 		FS_Write( pFile, &fileSize, sizeof( int ));
 		FS_FileCopy( pFile, pCopy, fileSize );
@@ -786,8 +786,8 @@ SAVERESTOREDATA *SV_SaveInit( int size )
 	VectorClear( pSaveData->vecLandmarkOffset );
 	pSaveData->fUseLandmark = false;
 	pSaveData->connectionCount = 0;
-		
-	// shared with dlls	
+
+	// shared with dlls
 	svgame.globals->pSaveData = pSaveData;
 
 	return pSaveData;
@@ -799,7 +799,7 @@ void SV_SaveGameStateGlobals( SAVERESTOREDATA *pSaveData )
 	SAVE_HEADER	header;
 	SAVE_LIGHTSTYLE	light;
 	int		i;
-	
+
 	Q_memset( &header, 0, sizeof( SAVE_HEADER ) );
 	Q_memset( &light, 0, sizeof( SAVE_LIGHTSTYLE ) );
 
@@ -880,7 +880,7 @@ SAVERESTOREDATA *SV_LoadSaveData( const char *level )
 	SAVERESTOREDATA		*pSaveData;
 	char			*pszTokenList;
 	int			i, id, size, version;
-	
+
 	Q_snprintf( name, sizeof( name ), "save/%s.hl1", level );
 	MsgDev( D_INFO, "Loading game from %s...\n", name );
 
@@ -907,10 +907,10 @@ SAVERESTOREDATA *SV_LoadSaveData( const char *level )
 
 	pSaveData = Mem_Alloc( host.mempool, sizeof(SAVERESTOREDATA) + SumBytes( &sectionsInfo ));
 	Q_strncpy( pSaveData->szCurrentMapName, level, sizeof( pSaveData->szCurrentMapName ));
-	
+
 	FS_Read( pFile, (char *)(pSaveData + 1), SumBytes( &sectionsInfo ));
 	FS_Close( pFile );
-	
+
 	// Parse the symbol table
 	pszTokenList = (char *)(pSaveData + 1);	// Skip past the CSaveRestoreData structure
 
@@ -948,7 +948,7 @@ SAVERESTOREDATA *SV_LoadSaveData( const char *level )
 	pSaveData->time = 0.0f;
 	VectorClear( pSaveData->vecLandmarkOffset );
 
-	// shared with dlls	
+	// shared with dlls
 	svgame.globals->pSaveData = pSaveData;
 
 	return pSaveData;
@@ -985,7 +985,7 @@ void SV_ParseSaveTables( SAVERESTOREDATA *pSaveData, SAVE_HEADER *pHeader, int s
 	// read adjacency list
 	for( i = 0; i < pSaveData->connectionCount; i++ )
 	{
-		LEVELLIST	*pList = &pSaveData->levelList[i];		
+		LEVELLIST	*pList = &pSaveData->levelList[i];
 		svgame.dllFuncs.pfnSaveReadFields( pSaveData, "ADJACENCY", pList, gAdjacency, ARRAYSIZE( gAdjacency ));
 	}
 
@@ -1132,7 +1132,7 @@ void SV_SaveClientState( SAVERESTOREDATA *pSaveData, const char *level )
 
 		FS_Write( pFile, localPos, sizeof( localPos ));
 		FS_Write( pFile, &nameSize, sizeof( nameSize ));
-		FS_Write( pFile, entry->name, nameSize ); 
+		FS_Write( pFile, entry->name, nameSize );
 		FS_Write( pFile, &entry->entityIndex, sizeof( entry->entityIndex ));
 		FS_Write( pFile, &entry->flags, sizeof( entry->flags ));
 		FS_Write( pFile, &decalScale, sizeof( decalScale ));
@@ -1164,7 +1164,7 @@ void SV_SaveClientState( SAVERESTOREDATA *pSaveData, const char *level )
 		nameSize = Q_strlen( entry->model ) + 1;
 
 		FS_Write( pFile, &nameSize, sizeof( nameSize ));
-		FS_Write( pFile, entry->model, nameSize ); 
+		FS_Write( pFile, entry->model, nameSize );
 		FS_Write( pFile, entry->origin, sizeof( entry->origin ));
 		FS_Write( pFile, entry->angles, sizeof( entry->angles ));
 		FS_Write( pFile, &entry->sequence, sizeof( entry->sequence ));
@@ -1199,7 +1199,7 @@ void SV_SaveClientState( SAVERESTOREDATA *pSaveData, const char *level )
 		nameSize = Q_strlen( entry->name ) + 1;
 
 		FS_Write( pFile, &nameSize, sizeof( nameSize ));
-		FS_Write( pFile, entry->name, nameSize ); 
+		FS_Write( pFile, entry->name, nameSize );
 		FS_Write( pFile, entry->origin, sizeof( entry->origin ));
 		FS_Write( pFile, &entry->entnum, sizeof( entry->entnum ));
 		FS_Write( pFile, &entry->volume, sizeof( entry->volume ));
@@ -1235,7 +1235,7 @@ void SV_SaveClientState( SAVERESTOREDATA *pSaveData, const char *level )
 
 	// AT END
 	FS_Seek( pFile, header_offset, SEEK_SET );
-	FS_Write( pFile, &sections, sizeof( sections ));	// write real sections info	
+	FS_Write( pFile, &sections, sizeof( sections ));	// write real sections info
 
 	FS_Close( pFile );
 }
@@ -1257,7 +1257,7 @@ void SV_LoadClientState( SAVERESTOREDATA *pSaveData, const char *level, qboolean
 	ClientSections_t	sections;
 	soundlist_t	soundInfo[MAX_CHANNELS];
 	int		soundCount;
-	
+
 	Q_snprintf( name, sizeof( name ), "save/%s.hl2", level );
 
 	pFile = FS_Open( name, "rb", true );
@@ -1269,7 +1269,7 @@ void SV_LoadClientState( SAVERESTOREDATA *pSaveData, const char *level, qboolean
 		FS_Close( pFile );
 		return;
 	}
-		
+
 	FS_Read( pFile, &tag, sizeof( int ));
 	if( tag != CLIENT_SAVEGAME_VERSION )
 	{
@@ -1303,7 +1303,7 @@ void SV_LoadClientState( SAVERESTOREDATA *pSaveData, const char *level, qboolean
 
 			FS_Read( pFile, localPos, sizeof( localPos ));
 			FS_Read( pFile, &nameSize, sizeof( nameSize ));
-			FS_Read( pFile, entry->name, nameSize ); 
+			FS_Read( pFile, entry->name, nameSize );
 			FS_Read( pFile, &entry->entityIndex, sizeof( entry->entityIndex ));
 			FS_Read( pFile, &entry->flags, sizeof( entry->flags ));
 			FS_Read( pFile, &decalScale, sizeof( decalScale ));
@@ -1353,7 +1353,7 @@ void SV_LoadClientState( SAVERESTOREDATA *pSaveData, const char *level, qboolean
 			entry = &sv.static_entities[i];
 
 			FS_Read( pFile, &nameSize, sizeof( nameSize ));
-			FS_Read( pFile, entry->model, nameSize ); 
+			FS_Read( pFile, entry->model, nameSize );
 			FS_Read( pFile, entry->origin, sizeof( entry->origin ));
 			FS_Read( pFile, entry->angles, sizeof( entry->angles ));
 			FS_Read( pFile, &entry->sequence, sizeof( entry->sequence ));
@@ -1390,7 +1390,7 @@ void SV_LoadClientState( SAVERESTOREDATA *pSaveData, const char *level, qboolean
 			entry = &soundInfo[i];
 
 			FS_Read( pFile, &nameSize, sizeof( nameSize ));
-			FS_Read( pFile, entry->name, nameSize ); 
+			FS_Read( pFile, entry->name, nameSize );
 			FS_Read( pFile, entry->origin, sizeof( entry->origin ));
 			FS_Read( pFile, &entry->entnum, sizeof( entry->entnum ));
 			FS_Read( pFile, &entry->volume, sizeof( entry->volume ));
@@ -1482,7 +1482,7 @@ SAVERESTOREDATA *SV_SaveGameState( void )
 	}
 
 	sectionsInfo.nBytesData = SaveRestore_AccessCurPos( pSaveData ) - sections.pData;
-	
+
 	// Save necessary tables/dictionaries/directories
 	sections.pDataHeaders = SaveRestore_AccessCurPos( pSaveData );
 
@@ -1500,7 +1500,7 @@ SAVERESTOREDATA *SV_SaveGameState( void )
 
 		if( !SaveRestore_Write( pSaveData, pszToken, Q_strlen( pszToken ) + 1 ))
 			break;
-	}	
+	}
 
 	sectionsInfo.nBytesSymbols = SaveRestore_AccessCurPos( pSaveData ) - sections.pSymbols;
 	sectionsInfo.nSymbols = pSaveData->tokenCount;
@@ -1667,7 +1667,7 @@ int SV_LoadGameState( char const *level, qboolean createPlayers )
 
 	// restore server time
 	sv.time = header.time;
-	
+
 	return 1;
 }
 
@@ -1716,7 +1716,7 @@ int SV_CreateEntityTransitionList( SAVERESTOREDATA *pSaveData, int levelMask )
 					active = (pEntInfo->flags & levelMask) ? 1 : 0;
 
 					// spawn players
-					if(( pEntInfo->id > 0) && ( pEntInfo->id < svgame.globals->maxClients + 1 ))	
+					if(( pEntInfo->id > 0) && ( pEntInfo->id < svgame.globals->maxClients + 1 ))
 					{
 						edict_t	*ed = EDICT_NUM( pEntInfo->id );
 
@@ -1749,7 +1749,7 @@ int SV_CreateEntityTransitionList( SAVERESTOREDATA *pSaveData, int levelMask )
 
 	// re-base the savedata since we re-ordered the entity/table / restore fields
 	SaveRestore_Rebase( pSaveData );
-	
+
 	// now spawn entities
 	for( i = 0; i < pSaveData->tableCount; i++ )
 	{
@@ -1757,7 +1757,7 @@ int SV_CreateEntityTransitionList( SAVERESTOREDATA *pSaveData, int levelMask )
 		pent = pEntInfo->pent;
 		pSaveData->currentIndex = i;
 		SaveRestore_Seek( pSaveData, pEntInfo->location );
-		
+
 		if( SV_IsValidEdict( pent ) && ( pEntInfo->flags & levelMask )) // screen out the player if he's not to be spawned
 		{
 			if( pEntInfo->flags & FENTTABLE_GLOBAL )
@@ -1792,7 +1792,7 @@ int SV_CreateEntityTransitionList( SAVERESTOREDATA *pSaveData, int levelMask )
 					pent->v.flags |= FL_KILLME;
 				}
 			}
-			else 
+			else
 			{
 				MsgDev( D_INFO, "Transferring %s (%d)\n", STRING( pEntInfo->classname ), NUM_FOR_EDICT( pent ));
 
@@ -1833,7 +1833,7 @@ void SV_LoadAdjacentEnts( const char *pOldLevel, const char *pLandmarkName )
 	int		i, test, flags, index, movedCount = 0;
 	qboolean		foundprevious = false;
 	vec3_t		landmarkOrigin;
-	
+
 	Q_memset( &currentLevelData, 0, sizeof( SAVERESTOREDATA ));
 	svgame.globals->pSaveData = &currentLevelData;
 
@@ -1920,7 +1920,7 @@ void SV_ChangeLevel( qboolean loadfromsavedgame, const char *mapname, const char
 	string		_startspot;
 	char		*startspot;
 	SAVERESTOREDATA	*pSaveData = NULL;
-	
+
 	if( sv.state != ss_active )
 	{
 		Msg( "SV_ChangeLevel: server not running\n");
@@ -2017,7 +2017,7 @@ int SV_SaveGameSlot( const char *pSaveName, const char *pSaveComment )
 			MsgDev( D_ERROR, "Token Table Save/Restore overflow!\n" );
 			break;
 		}
-	}	
+	}
 
 	tokenSize = SaveRestore_AccessCurPos( pSaveData ) - pTokenData;
 	SaveRestore_Rewind( pSaveData, tokenSize );
@@ -2068,7 +2068,7 @@ int SV_SaveReadHeader( file_t *pFile, GAME_HEADER *pHeader, int readGlobalState 
 		FS_Close( pFile );
 		return 0;
 	}
-		
+
 	FS_Read( pFile, &tag, sizeof( int ));
 	if( tag != SAVEGAME_VERSION )
 	{
@@ -2116,13 +2116,13 @@ int SV_SaveReadHeader( file_t *pFile, GAME_HEADER *pHeader, int readGlobalState 
 	if( readGlobalState )
 		svgame.dllFuncs.pfnResetGlobalState();
 
-	svgame.dllFuncs.pfnSaveReadFields( pSaveData, "GameHeader", pHeader, gGameHeader, ARRAYSIZE( gGameHeader ));	
+	svgame.dllFuncs.pfnSaveReadFields( pSaveData, "GameHeader", pHeader, gGameHeader, ARRAYSIZE( gGameHeader ));
 
 	if( readGlobalState )
 		svgame.dllFuncs.pfnRestoreGlobalState( pSaveData );
 
 	SV_SaveFinish( pSaveData );
-	
+
 	return 1;
 }
 
@@ -2189,10 +2189,10 @@ qboolean SV_LoadGame( const char *pName )
 }
 
 /*
-================== 
+==================
 SV_SaveGetName
-================== 
-*/  
+==================
+*/
 void SV_SaveGetName( int lastnum, char *filename )
 {
 	int	a, b, c;
@@ -2268,26 +2268,26 @@ void SV_SaveGame( const char *pName )
 	}
 }
 
-/* 
-================== 
+/*
+==================
 SV_GetLatestSave
 
 used for reload game after player death
-================== 
+==================
 */
 const char *SV_GetLatestSave( void )
 {
 	search_t	*f = FS_Search( "save/*.sav", true, true );	// lookup only in gamedir
 	int	i, found = 0;
 	int	newest = 0, ft;
-	string	savename;	
+	string	savename;
 
 	if( !f ) return NULL;
 
 	for( i = 0; i < f->numfilenames; i++ )
 	{
 		ft = FS_FileTime( f->filenames[i], true );
-		
+
 		// found a match?
 		if( ft > 0 )
 		{
@@ -2305,7 +2305,7 @@ const char *SV_GetLatestSave( void )
 
 	if( found )
 		return va( "%s", savename ); // move to static memory
-	return NULL; 
+	return NULL;
 }
 
 qboolean SV_GetComment( const char *savename, char *comment )
@@ -2332,7 +2332,7 @@ qboolean SV_GetComment( const char *savename, char *comment )
 		FS_Close( f );
 		return 0;
 	}
-		
+
 	FS_Read( f, &tag, sizeof( int ));
 
 	if( tag == 0x0071 )
@@ -2457,14 +2457,14 @@ qboolean SV_GetComment( const char *savename, char *comment )
 	// delete the string table we allocated
 	Mem_Free( pTokenList );
 	Mem_Free( pSaveData );
-	FS_Close( f );	
+	FS_Close( f );
 
 	if( Q_strlen( name ) > 0 && Q_strlen( description ) > 0 )
 	{
 		time_t		fileTime;
 		const struct tm	*file_tm;
 		string		timestring;
-	
+
 		fileTime = FS_FileTime( savename, true );
 		file_tm = localtime( &fileTime );
 
@@ -2481,7 +2481,7 @@ qboolean SV_GetComment( const char *savename, char *comment )
 		Q_strncpy( comment + CS_SIZE + (CS_TIME * 2), description + CS_SIZE, CS_SIZE );
 
 		return 1;
-	}	
+	}
 
 	Q_strncpy( comment, "<unknown version>", MAX_STRING );
 

@@ -1030,19 +1030,19 @@ void SV_FinalMessage( char *message, qboolean reconnect )
 	BF_WriteByte( &msg, PRINT_HIGH );
 	BF_WriteString( &msg, va( "%s\n", message ));
 
-	if( reconnect )
+	/*if( reconnect )
 	{
 		BF_WriteByte( &msg, svc_changing );
 
 		if( sv.loadgame || svgame.globals->maxClients > 1 || sv.changelevel )
 			BF_WriteOneBit( &msg, 1 ); // changelevel
 		else BF_WriteOneBit( &msg, 0 );
-	}
-	else
-	{
+	}*/
+	//else
+	//{
 		BF_WriteByte( &msg, svc_disconnect );
-	}
-
+	//}
+	// TODO
 	// send it twice
 	// stagger the packets to crutch operating system limited buffers
 	for( i = 0, cl = svs.clients; i < svgame.globals->maxClients; i++, cl++ )

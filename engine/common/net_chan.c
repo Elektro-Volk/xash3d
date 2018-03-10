@@ -17,6 +17,7 @@ GNU General Public License for more details.
 #include "netchan.h"
 #include "mathlib.h"
 #include "net_encode.h"
+#include "munge.h"
 
 #define MAKE_FRAGID( id, count )	((( id & 0xffff ) << 16 ) | ( count & 0xffff ))
 #define FRAG_GETID( fragid )		(( fragid >> 16 ) & 0xffff )
@@ -25,7 +26,7 @@ GNU General Public License for more details.
 #define UDP_HEADER_SIZE		28
 
 #define FLOW_AVG			( 2.0 / 3.0 )	// how fast to converge flow estimates
-#define FLOW_INTERVAL		0.1		// don't compute more often than this    
+#define FLOW_INTERVAL		0.1		// don't compute more often than this
 #define MAX_RELIABLE_PAYLOAD		1200		// biggest packet that has frag and or reliable data
 #define MAX_RESEND_PAYLOAD		1400		// biggest packet on a resend
 
@@ -571,50 +572,32 @@ Netchan_UpdateFlow
 */
 void Netchan_UpdateFlow( netchan_t *chan )
 {
-	int		flow, start;
-	int		i, bytes = 0;
-	float		faccumulatedtime = 0.0;
-	flowstats_t	*pstat, *pprev;
-	flow_t		*pflow;
+	if (!chan)
+		return;
 
-	if( !chan ) return;
+	int bytes = 0;
+	float faccumulatedtime = 0.0f;
 
-	for( flow = 0; flow < 2; flow++ )
+	for (int flow = 0; flow < MAX_FLOWS; flow++)
 	{
-		pflow = &chan->flow[flow];
-
-		if(( host.realtime - pflow->nextcompute ) < FLOW_INTERVAL )
+		flow_t *pflow = &chan->flow[flow];
+		if (host.realtime - pflow->nextcompute < 0.1)
 			continue;
 
-		pflow->nextcompute = host.realtime + FLOW_INTERVAL;
-
-		start = pflow->current - 1;
-
-		pprev = &pflow->stats[start & ( MAX_LATENT - 1 )];
-
-		// compute data flow rate
-		for( i = 1; i < MAX_LATENT / 2; i++ )
+		pflow->nextcompute = host.realtime + 0.1;
+		int start = pflow->current - 1;
+		for (int i = 0; i < MAX_LATENT - 1; i++)
 		{
-			// Most recent message then backward from there
-			pstat = &pflow->stats[( start - i ) & ( MAX_LATENT - 1 )];
+			flowstats_t *pprev = &pflow->stats[(start - i) & 0x1F];
+			flowstats_t *pstat = &pflow->stats[(start - i - 1) & 0x1F];
 
-			bytes += ( pstat->size );
-			faccumulatedtime += ( pprev->time - pstat->time );
-			pprev = pstat;
+			faccumulatedtime += pprev->time - pstat->time;
+			bytes += pstat->size;
 		}
 
-		if( !faccumulatedtime )
-		{
-			pflow->kbytespersec = 0.0;
-		}
-		else
-		{
-			pflow->kbytespersec = (float)bytes / faccumulatedtime;
-			pflow->kbytespersec /= 1024.0;
-		}
-
-		pflow->avgkbytespersec = ( FLOW_AVG ) * pflow->avgkbytespersec + ( 1.0 - FLOW_AVG ) * pflow->kbytespersec;
-	}
+		pflow->kbytespersec = (faccumulatedtime == 0.0f) ? 0.0f : bytes / faccumulatedtime / 1024.0f;
+		pflow->avgkbytespersec = pflow->avgkbytespersec * (2.0 / 3) + pflow->kbytespersec * (1.0 / 3);
+}
 }
 
 /*
@@ -1164,7 +1147,7 @@ qboolean Netchan_CopyFileFragments( netchan_t *chan, sizebuf_t *msg )
 
 		// first message has the file name, don't write that into the data stream,
 		// just write the rest of the actual data
-		if( p == chan->incomingbufs[FRAG_FILE_STREAM] ) 
+		if( p == chan->incomingbufs[FRAG_FILE_STREAM] )
 		{
 			// copy it in
 			cursize -= BF_GetNumBytesRead( msg );
@@ -1246,7 +1229,7 @@ void Netchan_UpdateProgress( netchan_t *chan )
 
 			p = chan->incomingbufs[i];
 
-			if( i == FRAG_FILE_STREAM ) 
+			if( i == FRAG_FILE_STREAM )
 			{
 				char	sz[MAX_SYSPATH];
 				char	*in, *out;
@@ -1339,7 +1322,7 @@ void Netchan_TransmitBits( netchan_t *chan, int length, byte *data )
 		int	send_from_frag[MAX_STREAMS] = { 0, 0 };
 		int	send_from_regular = false;
 
-		// if we have data in the waiting list(s) and we have cleared the current queue(s), then 
+		// if we have data in the waiting list(s) and we have cleared the current queue(s), then
 		// push the waitlist(s) into the current queue(s)
 		Netchan_FragSend( chan );
 
@@ -1357,7 +1340,7 @@ void Netchan_TransmitBits( netchan_t *chan, int length, byte *data )
 
 		// stall reliable payloads if sending from frag buffer
 		if( send_from_regular && ( send_from_frag[FRAG_NORMAL_STREAM] ))
-		{	
+		{
 			send_from_regular = false;
 
 			// if the reliable buffer has gotten too big, queue it at the end of everything and clear out buffer
@@ -1456,7 +1439,7 @@ void Netchan_TransmitBits( netchan_t *chan, int length, byte *data )
 				chan->frag_length[i] = BF_GetNumBitsWritten( &pbuf->frag_message );
 
 				// unlink pbuf
-				Netchan_UnlinkFragment( pbuf, &chan->fragbufs[i] );	
+				Netchan_UnlinkFragment( pbuf, &chan->fragbufs[i] );
 
 				chan->reliable_fragment[i] = 1;
 
@@ -1489,7 +1472,7 @@ void Netchan_TransmitBits( netchan_t *chan, int length, byte *data )
 
 	if( send_reliable && send_reliable_fragment )
 	{
-		w1 |= ( 1U << 30 );
+		w1 |= ( 1 << 30 );
 	}
 
 	chan->outgoing_sequence++;
@@ -1501,8 +1484,8 @@ void Netchan_TransmitBits( netchan_t *chan, int length, byte *data )
 	// send the qport if we are a client
 	if( chan->sock == NS_CLIENT )
 	{
-		BF_WriteWord( &send, net_qport->integer);
-	}	
+		//BF_WriteWord( &send, net_qport->integer);
+	}
 
 	if( send_reliable && send_reliable_fragment )
 	{
@@ -1515,7 +1498,7 @@ void Netchan_TransmitBits( netchan_t *chan, int length, byte *data )
 				BF_WriteLong( &send, chan->frag_startpos[i] );
 				BF_WriteLong( &send, chan->frag_length[i] );
 			}
-			else 
+			else
 			{
 				BF_WriteByte( &send, 0 );
 			}
@@ -1545,15 +1528,16 @@ void Netchan_TransmitBits( netchan_t *chan, int length, byte *data )
 	if( BF_GetNumBytesWritten( &send ) < 16 ) // packet too small for some networks
 	{
 		// go ahead and pad a full 16 extra bytes -- this only happens during authentication / signon
-		for( i = BF_GetNumBytesWritten( &send ); i < 16; i++ )		
+		for( i = BF_GetNumBytesWritten( &send ); i < 16; i++ )
 		{
 			// NOTE: that the server can parse svc_nop, too.
-			BF_WriteByte( &send, 1 );
+			BF_WriteByte( &send, 1 ); // -------------- BACI_-------------
 		}
 	}
 
-	chan->flow[FLOW_OUTGOING].stats[chan->flow[FLOW_OUTGOING].current & ( MAX_LATENT-1 )].size = BF_GetNumBytesWritten( &send ) + UDP_HEADER_SIZE;
-	chan->flow[FLOW_OUTGOING].stats[chan->flow[FLOW_OUTGOING].current & ( MAX_LATENT-1 )].time = host.realtime;
+	int statId = chan->flow[FLOW_OUTGOING].current & 0x1F;
+	chan->flow[FLOW_OUTGOING].stats[statId].size = BF_GetNumBytesWritten( &send ) + UDP_HEADER_SIZE;
+	chan->flow[FLOW_OUTGOING].stats[statId].time = host.realtime;
 	chan->flow[FLOW_OUTGOING].totalbytes += ( BF_GetNumBytesWritten( &send ) + UDP_HEADER_SIZE );
 	chan->flow[FLOW_OUTGOING].current++;
 
@@ -1569,6 +1553,13 @@ void Netchan_TransmitBits( netchan_t *chan, int length, byte *data )
 	// send the datagram
 	if( !CL_IsPlaybackDemo( ))
 	{
+		file_t	*f = FS_Open( "toserver.debug", "a", true );
+		FS_Write( f, BF_GetData( &send ), BF_GetNumBytesWritten( &send ));
+		FS_Write( f, "|", 1);
+		FS_Close(f);
+
+		COM_Munge2(send.pData + 8, BF_GetNumBytesWritten( &send ) - 8, (unsigned char)(chan->outgoing_sequence - 1));
+
 		unsigned int size = BF_GetNumBytesWritten( &send );
 
 		if( chan->split && size > chan->maxpacket )
@@ -1662,6 +1653,13 @@ qboolean Netchan_Process( netchan_t *chan, sizebuf_t *msg )
 
 	message_contains_fragments = sequence & ( 1U << 30 ) ? true : false;
 
+	COM_UnMunge2(&net_message.pData[8], BF_GetMaxBytes( msg ) - 8, sequence & 0xFF);
+
+	file_t	*f = FS_Open( "netdata.debug", "a", true );
+	FS_Write( f, BF_GetData( &net_message ), BF_GetMaxBytes( &net_message ));
+	FS_Write( f, "|", 1);
+	FS_Close(f);
+
 	if( message_contains_fragments )
 	{
 		for( i = 0; i < MAX_STREAMS; i++ )
@@ -1676,9 +1674,9 @@ qboolean Netchan_Process( netchan_t *chan, sizebuf_t *msg )
 		}
 	}
 
-	sequence &= ~(1U<<31);	
+	sequence &= ~(1U<<31);
 	sequence &= ~(1U<<30);
-	sequence_ack &= ~(1U<<31);	
+	sequence_ack &= ~(1U<<31);
 
 	if( net_showpackets->integer == 2 )
 	{
@@ -1690,7 +1688,7 @@ qboolean Netchan_Process( netchan_t *chan, sizebuf_t *msg )
 			, c
 			, BF_GetMaxBytes( msg )
 			, sequence & 63
-			, sequence_ack & 63 
+			, sequence_ack & 63
 			, reliable_message
 			, (float)Sys_DoubleTime( ));
 	}
@@ -1744,7 +1742,7 @@ qboolean Netchan_Process( netchan_t *chan, sizebuf_t *msg )
 		}
 	}
 
-	// if this message contains a reliable message, bump incoming_reliable_sequence 
+	// if this message contains a reliable message, bump incoming_reliable_sequence
 	chan->incoming_sequence = sequence;
 	chan->incoming_acknowledged = sequence_ack;
 	chan->incoming_reliable_acknowledged = reliable_ack;
@@ -1836,5 +1834,5 @@ qboolean Netchan_Process( netchan_t *chan, sizebuf_t *msg )
 			return false;
 		}
 	}
-	return true;
+return true;
 }

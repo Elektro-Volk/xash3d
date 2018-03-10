@@ -33,7 +33,7 @@ const char *svc_strings[256] =
 	"svc_bad",
 	"svc_nop",
 	"svc_disconnect",
-	"svc_changing",
+	"svc_event",
 	"svc_version",
 	"svc_setview",
 	"svc_sound",
@@ -41,15 +41,15 @@ const char *svc_strings[256] =
 	"svc_print",
 	"svc_stufftext",
 	"svc_setangle",
-	"svc_serverdata",
+	"svc_serverinfo",
 	"svc_lightstyle",
 	"svc_updateuserinfo",
-	"svc_deltatable",
+	"svc_deltadescription",
 	"svc_clientdata",
 	"svc_stopsound",
-	"svc_updatepings",
+	"svc_pings",
 	"svc_particle",
-	"svc_restoresound",
+	"svc_damage",
 	"svc_spawnstatic",
 	"svc_event_reliable",
 	"svc_spawnbaseline",
@@ -57,43 +57,40 @@ const char *svc_strings[256] =
 	"svc_setpause",
 	"svc_signonnum",
 	"svc_centerprint",
-	"svc_event",
-	"svc_soundindex",
-	"svc_ambientsound",
+	"svc_killedmonster",
+	"svc_foundsecret",
+	"svc_spawnstaticsound",
 	"svc_intermission",
-	"svc_modelindex",
+	"svc_finale",
 	"svc_cdtrack",
-	"svc_serverinfo",
-	"svc_eventindex",
+	"svc_restore",
+	"svc_cutscene",
 	"svc_weaponanim",
-	"svc_bspdecal",
+	"svc_decalname",
 	"svc_roomtype",
 	"svc_addangle",
-	"svc_usermessage",
+	"svc_newusermsg",
 	"svc_packetentities",
 	"svc_deltapacketentities",
-	"svc_chokecount",
+	"svc_choke",
 	"svc_resourcelist",
-	"svc_deltamovevars",
+	"svc_newmovevars",
+	"svc_resourcerequest",
 	"svc_customization",
-	"svc_unused46",
 	"svc_crosshairangle",
 	"svc_soundfade",
-	"svc_unused49",
-	"svc_unused50",
+	"svc_filetxferfailed",
+	"svc_hltv",
 	"svc_director",
-	"svc_studiodecal",
-	"svc_unused53",
-	"svc_unused54",
-	"svc_unused55",
-	"svc_unused56",
-	"svc_querycvarvalue",
-	"svc_querycvarvalue2",
-	"svc_unused59",
-	"svc_unused60",
-	"svc_unused61",
-	"svc_unused62",
-	"svc_unused63",
+	"svc_voiceinit",
+	"svc_voicedata",
+	"svc_sendextrainfo",
+	"svc_timescale",
+	"svc_resourcelocation",
+	"svc_sendcvarvalue",
+	"svc_sendcvarvalue2",
+	"svc_startofusermessages",
+	"svc_endoflist",
 };
 
 typedef struct
@@ -105,7 +102,7 @@ typedef struct
 
 typedef struct
 {
-	oldcmd_t	oldcmd[MSG_COUNT];   
+	oldcmd_t	oldcmd[MSG_COUNT];
 	int	currentcmd;
 	qboolean	parsing;
 } msg_debug_t;
@@ -153,7 +150,7 @@ void CL_Parse_RecordCommand( int cmd, int startoffset )
 	int	slot;
 
 	if( cmd == svc_nop ) return;
-	
+
 	slot = ( cls_message_debug.currentcmd++ & MSG_MASK );
 	cls_message_debug.oldcmd[slot].command = cmd;
 	cls_message_debug.oldcmd[slot].starting_offset = startoffset;
@@ -171,7 +168,7 @@ void CL_WriteErrorMessage( int current_count, sizebuf_t *msg )
 {
 	file_t		*fp;
 	const char	*buffer_file = "buffer.dat";
-	
+
 	fp = FS_Open( buffer_file, "wb", false );
 	if( !fp ) return;
 
@@ -250,7 +247,7 @@ void CL_ParseSoundPacket( sizebuf_t *msg, qboolean is_ambient )
 {
 	vec3_t	pos;
 	int 	chan, sound;
-	float 	volume, attn;  
+	float 	volume, attn;
 	int	flags, pitch, entnum;
 	sound_t	handle = 0;
 
@@ -266,14 +263,14 @@ void CL_ParseSoundPacket( sizebuf_t *msg, qboolean is_ambient )
 
 	if( flags & SND_ATTENUATION )
 		attn = (float)BF_ReadByte( msg ) / 64.0f;
-	else attn = ATTN_NONE;	
+	else attn = ATTN_NONE;
 
 	if( flags & SND_PITCH )
 		pitch = BF_ReadByte( msg );
 	else pitch = PITCH_NORM;
 
 	// entity reletive
-	entnum = BF_ReadWord( msg ); 
+	entnum = BF_ReadWord( msg );
 
 	// positioned in space
 	BF_ReadVec3Coord( msg, pos );
@@ -310,7 +307,7 @@ void CL_ParseRestoreSoundPacket( sizebuf_t *msg )
 {
 	vec3_t	pos;
 	int 	chan, sound;
-	float 	volume, attn;  
+	float 	volume, attn;
 	int	flags, pitch, entnum;
 	double	samplePos, forcedEnd;
 	int	wordIndex;
@@ -328,7 +325,7 @@ void CL_ParseRestoreSoundPacket( sizebuf_t *msg )
 
 	if( flags & SND_ATTENUATION )
 		attn = (float)BF_ReadByte( msg ) / 64.0f;
-	else attn = ATTN_NONE;	
+	else attn = ATTN_NONE;
 
 	if( flags & SND_PITCH )
 		pitch = BF_ReadByte( msg );
@@ -344,7 +341,7 @@ void CL_ParseRestoreSoundPacket( sizebuf_t *msg )
 	else handle = cl.sound_index[sound]; // see precached sound
 
 	// entity reletive
-	entnum = BF_ReadWord( msg ); 
+	entnum = BF_ReadWord( msg );
 
 	// positioned in space
 	BF_ReadVec3Coord( msg, pos );
@@ -389,8 +386,8 @@ void CL_ParseParticles( sizebuf_t *msg )
 	vec3_t		org, dir;
 	int		i, count, color;
 	float		life;
-	
-	BF_ReadVec3Coord( msg, org );	
+
+	BF_ReadVec3Coord( msg, org );
 
 	for( i = 0; i < 3; i++ )
 		dir[i] = BF_ReadChar( msg ) * (1.0f / 16);
@@ -610,7 +607,7 @@ void CL_ParseServerData( sizebuf_t *msg )
 		Cvar_FullSet( "cl_background", "1", CVAR_READ_ONLY );
 	else Cvar_FullSet( "cl_background", "0", CVAR_READ_ONLY );
 
-	if( !cls.changelevel ) 
+	if( !cls.changelevel )
 	{
 		// continue playing if we are changing level
 		S_StopBackgroundTrack ();
@@ -651,7 +648,7 @@ void CL_ParseServerData( sizebuf_t *msg )
 
 	if(( cl_allow_levelshots->integer && !cls.changelevel ) || cl.background )
 	{
-		if( !FS_FileExists( va( "%s.bmp", cl_levelshot_name->string ), true )) 
+		if( !FS_FileExists( va( "%s.bmp", cl_levelshot_name->string ), true ))
 			Cvar_Set( "cl_levelshot_name", "*black" ); // render a black screen
 		cls.scrshot_request = scrshot_plaque; // request levelshot even if exist (check filetime)
 	}
@@ -670,14 +667,14 @@ void CL_ParseServerData( sizebuf_t *msg )
 			sf->fadeReset = title->fadeout;
 		}
 		else sf->fadeEnd = sf->fadeReset = 4.0f;
-	
+
 		sf->fadeFlags = FFADE_IN;
 		sf->fader = sf->fadeg = sf->fadeb = 0;
 		sf->fadealpha = 255;
 		sf->fadeSpeed = (float)sf->fadealpha / sf->fadeReset;
 		sf->fadeReset += cl.time;
 		sf->fadeEnd += sf->fadeReset;
-		
+
 		Cvar_SetFloat( "v_dark", 0.0f );
 	}
 
@@ -726,12 +723,12 @@ void CL_ParseClientData( sizebuf_t *msg )
 		}
 	}
 
-	cl.parsecount = i;					// ack'd incoming messages.  
-	cl.parsecountmod = cl.parsecount & CL_UPDATE_MASK;	// index into window.     
+	cl.parsecount = i;					// ack'd incoming messages.
+	cl.parsecountmod = cl.parsecount & CL_UPDATE_MASK;	// index into window.
 	frame = &cl.frames[cl.parsecountmod];			// frame at index.
 
 	frame->time = cl.mtime[0];				// mark network received time
-	frame->receivedtime = host.realtime;			// time now that we are parsing.  
+	frame->receivedtime = host.realtime;			// time now that we are parsing.
 
 	// send time for that frame.
 	parsecounttime = cl.commands[command_ack & CL_UPDATE_MASK].senttime;
@@ -781,8 +778,8 @@ void CL_ParseClientData( sizebuf_t *msg )
 			// otherwise, move in 1 ms steps toward observed channel latency.
 			if( latency < cls.latency )
 				cls.latency = latency;
-			else cls.latency += 0.001f; // drift up, so corrections are needed	
-		}	
+			else cls.latency += 0.001f; // drift up, so corrections are needed
+		}
 	}
 	else
 	{
@@ -790,7 +787,7 @@ void CL_ParseClientData( sizebuf_t *msg )
 	}
 
 	if( hltv->integer ) return;	// clientdata for spectators ends here
-	
+
 	to_cd = &frame->client;
 	to_wd = frame->weapondata;
 
@@ -897,7 +894,7 @@ add the view angle yaw
 void CL_ParseAddAngle( sizebuf_t *msg )
 {
 	float	add_angle;
-	
+
 	add_angle = BF_ReadBitAngle( msg, 16 );
 	cl.refdef.cl_viewangles[1] += add_angle;
 }
@@ -927,7 +924,7 @@ void CL_RegisterUserMessage( sizebuf_t *msg )
 {
 	char	*pszName;
 	int	svc_num, size;
-	
+
 	svc_num = BF_ReadByte( msg );
 	size = BF_ReadByte( msg );
 	pszName = BF_ReadString( msg );
@@ -1055,7 +1052,7 @@ void CL_UpdateUserPings( sizebuf_t *msg )
 {
 	int		i, slot;
 	player_info_t	*player;
-	
+
 	for( i = 0; i < MAX_CLIENTS; i++ )
 	{
 		if( !BF_ReadOneBit( msg )) break; // end of message
@@ -1103,7 +1100,7 @@ void CL_CheckingResFile( char *pResFileName )
 
 	downloadcount++;
 
-	
+
 	if( cl_allow_fragment->integer )
 	{
 		Msg( "Starting file download: %s\n", pResFileName );
@@ -1569,6 +1566,7 @@ void CL_ParseServerMessage( sizebuf_t *msg )
 	int	bufStart, playerbytes;
 
 	cls_message_debug.parsing = true;		// begin parsing
+	//msg->iCurBit+=8*8;
 	starting_count = BF_GetNumBytesRead( msg );	// updates each frame
 
 	// parse the message
@@ -1585,9 +1583,11 @@ void CL_ParseServerMessage( sizebuf_t *msg )
 
 		// end of message
 		if( BF_GetNumBitsLeft( msg ) < 8 )
-			break;		
+			break;
+
 
 		cmd = BF_ReadByte( msg );
+		MsgDev(D_INFO, "CMD: %s; POS: %i; CMDI: %i\n", svc_strings[cmd], starting_count, cmd);
 
 		// record command for debugging spew on parse problem
 		CL_Parse_RecordCommand( cmd, bufStart );
@@ -1647,7 +1647,7 @@ void CL_ParseServerMessage( sizebuf_t *msg )
 		case svc_time:
 			// shuffle timestamps
 			cl.mtime[1] = cl.mtime[0];
-			cl.mtime[0] = BF_ReadFloat( msg );			
+			cl.mtime[0] = BF_ReadFloat( msg );
 			break;
 		case svc_print:
 			i = BF_ReadByte( msg );

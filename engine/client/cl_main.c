@@ -1845,9 +1845,10 @@ void CL_ReadNetMessage( void )
 		}
 
 		if( !cls.demoplayback && !Netchan_Process( &cls.netchan, &net_message ))
-			continue;	// wasn't accepted for some reason
+			//continue;	// wasn't accepted for some reason
+			MsgDev( D_ERROR, "WTF");
 
-		CL_ParseServerMessage( &net_message );
+			CL_ParseServerMessage( &net_message );
 	}
 
 	// check for fragmentation/reassembly related packets.
