@@ -1290,7 +1290,7 @@ void Netchan_TransmitBits( netchan_t *chan, int length, byte *data )
 	int	i, j;
 	float	fRate;
 
-	// check for message overflow
+
 	// check for message overflow
 	if( BF_CheckOverflow( &chan->message ))
 	{
@@ -1612,6 +1612,54 @@ void Netchan_Transmit( netchan_t *chan, int lengthInBytes, byte *data )
 	Netchan_TransmitBits( chan, lengthInBytes << 3, data );
 }
 
+qboolean Netchan_Validate(netchan_t *chan, qboolean *frag_message, unsigned int *fragid, int *frag_offset, int *frag_length)
+{
+	for (int i = 0; i < MAX_STREAMS; i++)
+	{
+		if (!frag_message[i])
+			continue;
+
+#ifndef REHLDS_FIXES
+		if (FRAG_GETID(fragid[i]) > MAX_STREAMS || FRAG_GETCOUNT(fragid[i]) > MAX_STREAMS)
+		{
+			return false;
+		}
+
+		if ((unsigned int)frag_length[i] > 0x800 || (unsigned int)frag_offset[i] > 0x4000)
+		{
+			return false;
+		}
+#else // REHLDS_FIXES
+		// total fragments should be <= MAX_FRAGMENTS and current fragment can't be > total fragments
+		if (i == FRAG_NORMAL_STREAM && FRAG_GETCOUNT(fragid[i]) > MAX_NORMAL_FRAGMENTS)
+			return false;
+		if (i == FRAG_FILE_STREAM && FRAG_GETCOUNT(fragid[i]) > MAX_FILE_FRAGMENTS)
+			return false;
+		if (FRAG_GETID(fragid[i]) > FRAG_GETCOUNT(fragid[i]))
+			return false;
+		if (!frag_length[i])
+			return false;
+		if ((size_t)frag_length[i] > FRAGMENT_MAX_SIZE || (size_t)frag_offset[i] > NET_MAX_PAYLOAD - 1)
+			return false;
+
+		int frag_end = frag_offset[i] + frag_length[i];
+
+		// end of fragment is out of the packet
+		if (frag_end + msg_readcount > net_message.cursize)
+			return false;
+
+		// fragment overlaps next stream's fragment or placed after it
+		for (int j = i + 1; j < MAX_STREAMS; j++)
+		{
+			if (frag_end > frag_offset[j] && frag_message[j]) // don't add msg_readcount for comparison
+				return false;
+		}
+#endif // REHLDS_FIXES
+	}
+
+	return true;
+}
+
 /*
 =================
 Netchan_Process
@@ -1651,11 +1699,16 @@ qboolean Netchan_Process( netchan_t *chan, sizebuf_t *msg )
 	reliable_message = sequence >> 31;
 	reliable_ack = sequence_ack >> 31;
 
-	message_contains_fragments = sequence & ( 1U << 30 ) ? true : false;
+	message_contains_fragments = sequence & ( 1U << 31 ) ? true : false;
+
+	if (message_contains_fragments) {
+		BF_ReadLong( msg );BF_ReadLong( msg );
+	}
 
 	COM_UnMunge2(&net_message.pData[8], BF_GetMaxBytes( msg ) - 8, sequence & 0xFF);
 
 	file_t	*f = FS_Open( "netdata.debug", "a", true );
+	FS_Write( f, message_contains_fragments ? "S" : "N", 1);
 	FS_Write( f, BF_GetData( &net_message ), BF_GetMaxBytes( &net_message ));
 	FS_Write( f, "|", 1);
 	FS_Close(f);
@@ -1672,6 +1725,9 @@ qboolean Netchan_Process( netchan_t *chan, sizebuf_t *msg )
 				frag_length[i] = (int)BF_ReadLong( msg );
 			}
 		}
+
+		if (!Netchan_Validate(chan, frag_message, fragid, frag_offset, frag_length))
+			return false;
 	}
 
 	sequence &= ~(1U<<31);

@@ -1603,8 +1603,8 @@ void CL_ParseServerMessage( sizebuf_t *msg )
 			break;
 		case svc_disconnect:
 			MsgDev( D_INFO, "Disconnected from server\n" );
-			CL_Drop ();
-			Host_AbortCurrentFrame ();
+			//CL_Drop ();
+			//Host_AbortCurrentFrame ();
 			break;
 		case svc_changing:
 			if( BF_ReadOneBit( msg ) )

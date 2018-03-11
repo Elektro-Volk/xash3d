@@ -115,10 +115,11 @@ int BF_ReadByte( sizebuf_t *bf );
 int BF_ReadShort( sizebuf_t *bf );
 int BF_ReadWord( sizebuf_t *bf );
 int BF_ReadLong( sizebuf_t *bf );
+int BF_ReadLong( sizebuf_t *bf );
 float BF_ReadCoord( sizebuf_t *bf );
 float BF_ReadFloat( sizebuf_t *bf );
 void BF_ReadVec3Coord( sizebuf_t *bf, vec3_t fa );
 qboolean BF_ReadBytes( sizebuf_t *bf, void *pOut, int nBytes );
 char *BF_ReadStringExt( sizebuf_t *bf, qboolean bLine );
-					
+
 #endif//NET_BUFFER_H
